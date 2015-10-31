@@ -1,0 +1,62 @@
+N-Triples :
+-----------
+
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix unicaen: <http://www.unicaen.fr#> .
+
+unicaen:Universite rdfs:subClassOf unicaen:Etablissement_enseignement .
+unicaen:Etablissement_enseignement rdf:type rdfs:Class .
+unicaen:Unicaen rdf:type unicaen:Universite .
+unicaen:Unicaen unicaen:academie "Caen" .
+unicaen:Unicaen unicaen:statut "Public" .
+unicaen:Unicaen unicaen:code "0141720U" .
+unicaen:Unicaen unicaen:nom "Université de Caen Basse-Normandie" .
+unicaen:Unicaen unicaen:sigle "ENSICAEN" .
+unicaen:Unicaen unicaen:type "École d'ingénieurs" .
+unicaen:Unicaen unicaen:possede _:Adresse .
+unicaen:Unicaen unicaen:depend unicaen:Ministere_Enseignement_Superieur_Recherche .
+unicaen:Ministere_Enseignement_Superieur_Recherche rdf:type unicaen:Tutelle .
+_:Adresse unicaen:intitule "6 boulevard Maréchal Juin" .
+_:Adresse unicaen:CP "14050" .
+_:Adresse unicaen:latitude "-.3821236" .
+_:Adresse unicaen:longitude "49.2059761" .
+_:Adresse unicaen:commune "Caen" .
+_:Adresse unicaen:departement "14 - Calvados" .
+_:Adresse unicaen:region "Basse-Normandie" .
+_:Adresse rdf:type unicaen:Coordonnees .
+
+SPARQL :
+--------
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+SELECT ?nom WHERE { unicaen:Unicaen unicaen:nom ?nom . }
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+SELECT ?intitule WHERE { _:Adresse unicaen:intitule ?intitule . }
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+SELECT ?universite ?longitude WHERE { 
+  ?universite unicaen:possede _:Adresse .
+  _:Adresse unicaen:longitude ?longitude .
+}
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+INSERT DATA
+{ 
+  unicaen:Unicaen unicaen:surnom "CaenCaen" .
+}
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+INSERT DATA
+{ 
+  unicaen:Unicaen unicaen:sigle "DNR2I" .
+}
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+DELETE DATA { unicaen:Unicaen unicaen:surnom "CaenCaen" . }
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+DELETE { unicaen:Unicaen unicaen:sigle "DNR2I" . }
+INSERT { unicaen:Unicaen unicaen:sigle "DNR3I" . }
+WHERE { unicaen:Unicaen unicaen:sigle "DNR2I" . }

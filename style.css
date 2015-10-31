@@ -1,0 +1,128 @@
+* {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+header {
+    background-image: url('texture.png');
+    color: white;
+    text-align: center;
+    font-family: Ubuntu, sans-serif;
+    margin-bottom: 30px;
+}
+
+header h1 {
+    padding: 15px;
+    font-variant: small-caps;
+}
+
+header #credits {
+    padding-bottom: 15px;
+}
+
+header #credits span {
+    display: block;
+}
+
+article {
+    background-color: white;
+    color: #323232;
+}
+
+.wrapper {
+    width: 90%;
+    margin: auto;
+}
+
+.fleches {
+    display: block;
+    margin: auto;
+    width: 100px;
+    padding: 30px;
+}
+
+figure {
+    width: 1000px;
+    margin: auto;
+    padding: 30px 30px 0 30px;
+    border: solid 5px #323232;
+    transition: transform .5s ease;
+}
+
+figure img {
+    width: 1000px;
+    display: block;
+    margin: auto;
+}
+
+figure figcaption {
+    background-color: #323232;
+    padding: 5px 30px;
+    color: white;
+    margin-top: 15px;
+    width: 100%;
+    position: relative;
+    right: 30px;
+}
+
+figure:hover {
+    transform: scale(1.03);
+}
+
+h2 {
+    background-image: url('texture.png');
+    color: white;
+    padding: 20px;
+    margin: 30px 0;
+    text-align: center;
+    font-family: Ubuntu, sans-serif;
+    font-size: 20px;
+    font-variant: small-caps;
+}
+
+h3 {
+    margin-top: 50px;
+}
+
+p {
+    margin: 12px 0;
+}
+
+.gras {
+    font-weight: bold;
+}
+
+ul li, ol li {
+    font-style: italic;
+    margin: 3px;
+}
+
+ul li {
+    list-style-type: circle;
+}
+
+a {
+    background-color: #F2F2F2;
+    text-decoration: none;
+    color: gray;
+    margin: 5px 0;
+    font-weight: bold;
+    font-size: x-large;
+    display: block;
+    text-align: center;
+    transition: background-color .5s ease;
+}
+
+a:hover {
+    background-color: gray;
+    color: white;
+}
+
+footer {
+    background-image: url('texture.png');
+    padding: 30px;
+    margin-top: 50px;
+    text-align: center;
+    color: white;
+}

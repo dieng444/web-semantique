@@ -1,0 +1,24 @@
+@prefix unicaen:<http://www.unicaen.fr#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+
+unicaen:Coltrane unicaen:Nom "John Coltrane" .
+unicaen:Coltrane unicaen:Nom "Trane" .
+unicaen:Coltrane unicaen:Appartient unicaen:Jazz .
+unicaen:Jazz rdf:type unicaen:Genre_Musical .
+
+unicaen:Ole unicaen:Appartient unicaen:Jazz .
+unicaen:Ole unicaen:Nom "Ole" .
+unicaen:Ole unicaen:Nom "Ole !" .
+
+unicaen:Morceau rdf:type unicaen:Ole .
+
+_:P1 unicaen:Performer unicaen:Coltrane .
+_:P1 unicaen:Oeuvre unicaen:Ole .
+_:P1 rdf:type unicaen:Performance .
+_:P1 unicaen:date "1969" .
+_:P1 unicaen:lieu unicaen:Village_Vanguard .
+
+unicaen:Village_Vanguard rdf:type unicaen:Lieu .
+unicaen:Village_Vanguard unicaen:Nom "Village Vanguard" .
+unicaen:Village_Vanguard unicaen:Se_Situe unicaen:New_York .
+unicaen:New_York unicaen:Nom "New York" .

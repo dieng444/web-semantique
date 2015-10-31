@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8" />
+	<title>Du CSV au RDF : vers une application web sémantique...</title>
+    <meta name="description" content="Transformation et fusion de fichiers CSV en graphes et triplets RDF pour un début d'application sémantique. Requêtes SPARQL incluses." />
+    <meta name="author" content="Macky Dieng, Baptiste Vannesson" />
+    <link rel="stylesheet" href="style.css" media="screen" />
+    <link rel="stylesheet" href="prism.css" />
+</head>
+
+<body>
+    <header>
+        <h1>Rapport de Web Sémantique</h1>
+        <div id="credits">
+            <span>Par Macky Dieng et Baptiste Vannesson</span>
+            <span>M1 DNR2I - Université de Caen Basse-Normandie</span>
+        </div>
+    </header>
+    <article>
+        <section>
+            <div class="wrapper">
+                <p>L'objectif du devoir était de concevoir un début d'application sémantique en partant de deux fichiers de données (CSV ou XML) institutionnelles. Nous avons ici choisi, d'une part, un fichier CSV ayant trait aux établissements d'enseignement supérieur et, d'autre part, un fichier CSV recensant les points poste.</p>
+                <p><span class="gras">Afin de mieux appréhender les données, il nous a semblé logique de procéder de la manière suivante :</span></p>
+                <ol>
+                    <li>Analyse du premier fichier sur les établissements d'enseignement supérieur</li>
+                    <li>Modélisation de ce fichier à l'aide d'un graphe d'instance RDF (exemple utilisé : Université de Caen)</li>
+                    <li>Développement d'un script PHP pour la sérialisation globale du graphe induit (autrement dit de toutes les instances)</li>
+                    <li>Vérification de conformité du fichier de sortie (au format Turtle)</li>
+                    <li>Analyse du deuxième fichier sur les points poste</li>
+                    <li>Modélisation de ce fichier à l'aide d'un graphe d'instance RDF (exemple utilisé : bureau de poste &laquo; Caen Gambetta &raquo;)</li>
+                    <li>Développement d'un script PHP pour la sérialisation globale du graphe induit</li>
+                    <li>Vérification de conformité du fichier de sortie (au format Turtle)</li>
+                    <li>Comparaison des deux fichiers CSV et identification des points communs</li>
+                    <li>Fusion des deux schémas RDF à partir du blank node</li>
+                    <li>Fusion des scripts PHP pour la sérialisation du graphe final</li>
+                    <li>Vérification de conformité du fichier de sortie (au format Turtle)</li>
+                    <li>Intégration des triplets dans Sesame</li>
+                    <li>Requêtes SPARQL sur le triplestore ainsi obtenu</li>
+                    <li>Conception de ce rapport &#9786;</li>
+                </ol>
+                <p>Naturellement, vous retrouverez cette logique en lisant la suite de ce compte-rendu. Des flèches seront utilisées pour matéraliser le cheminement de notre réflexion.</p>
+                <p><span class="gras">Quelques remarques subsidiaires :</span></p>
+                <ul>
+                    <li>L'URI de base utilisée pour l'ensemble de l'exercice est symboliquement &laquo; http://www.unicaen.fr# &raquo;. La plupart des ressources en dépendent.</li>
+                    <li>Les fichiers RDF en sortie sont en UTF-8. Vérifiez bien que votre navigateur ne force pas l'encodage occidental pour que tout s'affiche correctement.</li>
+                    <li>Notre dernier script PHP génère plus de 250 000 triplets. Donc si votre navigateur met un peu de temps avant d'afficher le résultat, c'est parfaitement normal.</li>
+                    <li>Sesame n'acceptant pas 250 000 triplets d'un coup, nous avons décidé d'effectuer nos requêtes SPARQL sur environ 10 000 triplets (avec environ 5000 triplets concernant les établissements d'enseignement supérieur et environ 5000 triplets concernant les points poste).</li>
+                    <li>Sesame n'acceptant pas non plus les caractères spéciaux générés par la fonction &laquo; urlencode &raquo; de PHP, nous avons géré le cas des caractères spéciaux manuellement en remplaçant chaque caractère bloquant par un underscore (d'où le tableau passé en argument à la fonction &laquo; str_replace &raquo;).</li>
+                    <li>Les noms de communes du premier fichier ont sciemment été mis en majuscules pour que la liaison puisse se faire avec le deuxième fichier (où les noms de communes sont justement en majuscules). Sans cela, la casse aurait perturbé les inférences.</li>
+                    <li>Dans nos graphes, vous remarquerez que le point central est le blank node qui correspond en fait à l'adresse. Ce blank node s'est avéré très utile pour fusionner nos fichiers CSV qui possédaient tous les deux la notion d'adresse.</li>
+                    <li>Dans nos graphes, vous remarquerez aussi que les classes sont placées dans des cercles blancs, que les instances sont placées dans des disques noirs, et que les littéraux sont placés dans des rectangles. Les predicats sont quant à eux matérialisés par du texte associé à des flèches.</li>
+                    <li>Pour certaines requêtes en fin de rapport, vous constaterez que nous avons adopté une approche incrémentale par laquelle nous avons progressivement ajouté des couches de complexité à quelque chose d'initialement simple. Cette démarche est sans doute un bon moyen de tester les limites d'un moteur d'inférence.</li>
+                    <li>Vous pourrez enfin visualiser le résultat de nos requêtes de sélection via quelques screenshots. Les requêtes d'insertion et de suppression en sont dépourvues, pour des raisons évidentes...</li>
+                </ul>
+            </div>
+        </section>
+        <section>
+            <h2>Traitement d'un premier fichier : le cas des établissements d'enseignement supérieur</h2>
+            <div class="wrapper">
+                <a href="ressources/enseignement/enseignement.csv">&rarr; Télécharger le fichier CSV (input) &larr;</a>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <figure>
+                    <a href="ressources/enseignement/enseignement.png"><img src="ressources/enseignement/enseignement.png" alt="Schéma RDF des établissements d'enseignement supérieur" /></a>
+                    <figcaption>Schéma RDF des établissements d'enseignement supérieur (Université de Caen)</figcaption>
+                </figure>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <pre>
+                <code class="language-php">
+
+&lt;?php
+
+// Encodage de l'output (UTF-8)
+header('Content-Type: text/plain; charset=utf-8');
+
+// Ouverture du fichier en lecture
+$handle = fopen("enseignement.csv", "r");
+if (!$handle) { echo "Problème d'ouverture du fichier."; }
+
+// Initialisation du template
+$template = "";
+
+// Déclaration des préfixes d'URI
+$template .= "@prefix rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt; . \n";
+$template .= "@prefix rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt; . \n";
+$template .= "@prefix unicaen: &lt;http://www.unicaen.fr#&gt; . \n";
+
+// Création du premier triplet générique
+$template .= "unicaen:Etablissement_enseignement rdf:type rdfs:Class . \n";
+
+// Caractères spéciaux à ne pas mettre dans les triplets
+$specialChars = array
+                (
+                    " ", 
+                    "'", 
+                    "\"", 
+                    ",", 
+                    ";", 
+                    ".", 
+                    ":", 
+                    "?", 
+                    "!", 
+                    "&amp;", 
+                    "#", 
+                    "\\", 
+                    "/", 
+                    "*", 
+                    "(", 
+                    ")", 
+                    "[", 
+                    "]", 
+                    "{", 
+                    "}", 
+                    "~", 
+                    "@", 
+                    "€", 
+                    "$"
+                );
+
+// Parcours du fichier
+while (!feof($handle)) {
+	$ligne = trim(fgets($handle));
+	if ((strlen($ligne) &gt; 0) &amp;&amp; !(preg_match("#Code UAI#", $ligne))) {
+		list
+        (
+            $codeUai, 
+            $typeEtablissement, 
+            $nom, 
+            $sigle, 
+            $statut, 
+            $tutelle, 
+            $universite, 
+            $adresse, 
+            $codePostal, 
+            $commune, 
+            $departement, 
+            $academie, 
+            $region, 
+            $longitude, 
+            $latitude, 
+            $region
+        ) = explode(";", $ligne);
+        
+        // Construction des triplets RDF (instances et littéraux)
+        if (!empty($typeEtablissement)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $typeEtablissement)  . ' rdfs:subClassOf unicaen:Etablissement_enseignement .' . "\n";
+        if (!empty($tutelle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $tutelle)  . ' rdf:type unicaen:Tutelle .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($typeEtablissement)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' rdf:type unicaen:' . str_replace($specialChars, "_", $typeEtablissement) . ' .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($codeUai)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:possede _:Adresse' . $codeUai . ' .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($tutelle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:depend unicaen:' . str_replace($specialChars, "_", $tutelle) . ' .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($academie)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:academie ' . '"' . $academie . '" .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($statut)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:statut ' . '"' . $statut . '" .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($codeUai)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:code ' . '"' . $codeUai . '" .' . "\n";
+        if (!empty($nom)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:nom ' . '"' . $nom . '" .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($sigle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:sigle ' . '"' . $sigle . '" .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($typeEtablissement)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:type ' . '"' . $typeEtablissement . '" .' . "\n";
+        if (!empty($codeUai)) 
+            $template .= '_:Adresse' . $codeUai . ' rdf:type unicaen:Coordonnees .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($adresse)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:intitule ' . '"' . $adresse . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($codePostal)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:CP ' . '"' . $codePostal . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($latitude)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:latitude ' . '"' . $latitude . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($longitude)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:longitude ' . '"' . $longitude . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($departement)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:departement ' . '"' . $departement . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($region)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:region ' . '"' . $region . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($commune)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:commune ' . '"' . strtoupper($commune) . '" .' . "\n";
+    }
+}
+
+// Affichage du résultat
+echo $template;
+
+// Fermeture du fichier
+$close = fclose($handle);
+if (!$close) { echo "Problème de fermeture du fichier."; }
+                </code>
+                </pre>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <a href="ressources/enseignement/enseignement.rdf.txt">&rarr; Télécharger le fichier RDF (output) &larr;</a>
+            </div>
+        </section>
+        <section>
+            <h2>Traitement d'un deuxième fichier : le cas des points poste</h2>
+            <div class="wrapper">
+                <a href="ressources/poste/poste.csv">&rarr; Télécharger le fichier CSV (input) &larr;</a>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <figure>
+                    <a href="ressources/poste/poste.png"><img src="ressources/poste/poste.png" alt="Schéma RDF des points poste" /></a>
+                    <figcaption>Schéma RDF des points poste (Caen Gambetta)</figcaption>
+                </figure>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <pre>
+                <code class="language-php">
+
+&lt;?php
+
+// Encodage de l'output (UTF-8)
+header('Content-Type: text/plain; charset=utf-8');
+
+// Ouverture du fichier en lecture
+$handle = fopen("poste.csv", "r");
+if (!$handle) { echo "Problème d'ouverture du fichier."; }
+
+// Initialisation du template
+$template = "";
+
+// Déclaration des préfixes d'URI
+$template .= "@prefix rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt; . \n";
+$template .= "@prefix rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt; . \n";
+$template .= "@prefix unicaen: &lt;http://www.unicaen.fr#&gt; . \n";
+
+// Création du premier triplet générique
+$template .= "unicaen:Point_poste rdf:type rdfs:Class . \n";
+
+// Caractères spéciaux à ne pas mettre dans les triplets
+$specialChars = array
+                (
+                    " ", 
+                    "'",
+                    "\"", 
+                    ",",
+                    ";", 
+                    ".", 
+                    ":", 
+                    "?", 
+                    "!", 
+                    "&amp;", 
+                    "#", 
+                    "\\", 
+                    "/", 
+                    "*", 
+                    "(", 
+                    ")", 
+                    "[", 
+                    "]", 
+                    "{", 
+                    "}", 
+                    "~", 
+                    "@", 
+                    "€", 
+                    "$"
+                );
+
+// Parcours du fichier
+while (!feof($handle)) {
+	$ligne = trim(fgets($handle));
+	if ((strlen($ligne) &gt; 0) &amp;&amp; !(preg_match("#identifiant#", $ligne))) {
+		list
+        (
+            $identifiant, 
+            $libelle, 
+            $caracteristique, 
+            $adresse, 
+            $complementAdresse, 
+            $lieuDit, 
+            $codePostal, 
+            $localite, 
+            $pays, 
+            $latitude, 
+            $longitude
+        ) = explode(";", $ligne);
+        
+        // Construction des triplets RDF (instances et littéraux)
+        if (!empty($libelle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle)  . ' rdf:type unicaen:Point_poste .' . "\n";
+        if (!empty($libelle) &amp;&amp; !empty($identifiant)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle) . ' unicaen:se_situe _:Adresse' . $identifiant . ' .' . "\n";
+        if (!empty($libelle) &amp;&amp; !empty($identifiant)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle) . ' unicaen:identifiant ' . '"' . $identifiant . '" .' . "\n";
+        if (!empty($libelle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle) . ' unicaen:libelle ' . '"' . $libelle . '" .' . "\n";
+        if (!empty($libelle) &amp;&amp; !empty($caracteristique)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle) . ' unicaen:caracteristique ' . '"' . $caracteristique . '" .' . "\n";
+        if (!empty($identifiant)) 
+            $template .= '_:Adresse' . $identifiant . ' rdf:type unicaen:Coordonnees .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($adresse)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:intitule ' . '"' . $adresse . '" .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($codePostal)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:CP ' . '"' . $codePostal . '" .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($latitude)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:latitude ' . '"' . $latitude . '" .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($longitude)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:longitude ' . '"' . $longitude . '" .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($localite)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:commune ' . '"' . $localite . '" .' . "\n";
+    }
+}
+
+// Affichage du résultat
+echo $template;
+
+// Fermeture du fichier
+$close = fclose($handle);
+if (!$close) { echo "Problème de fermeture du fichier."; }
+                </code>
+                </pre>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <a href="ressources/poste/poste.rdf.txt">&rarr; Télécharger le fichier RDF (output) &larr;</a>
+            </div>
+        </section>
+        <section>
+            <h2>Fusion des deux fichiers</h2>
+            <div class="wrapper">
+                <a href="ressources/enseignement/enseignement.csv">&rarr; Télécharger le premier fichier CSV (input) &larr;</a>
+                <a href="ressources/poste/poste.csv">&rarr; Télécharger le deuxième fichier CSV (input) &larr;</a>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <figure>
+                    <a href="ressources/enseignement_poste/enseignement_poste.png"><img src="ressources/enseignement_poste/enseignement_poste.png" alt="Schéma RDF issu du croisement des deux schémas précédents" /></a>
+                    <figcaption>Schéma RDF issu du croisement des deux schémas précédents</figcaption>
+                </figure>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <pre>
+                <code class="language-php">
+
+&lt;?php
+
+// Encodage de l'output (UTF-8)
+header('Content-Type: text/plain; charset=utf-8');
+
+// Ouverture du fichier des établissements en lecture
+$handle = fopen("enseignement/enseignement.csv", "r");
+if (!$handle) { echo "Problème d'ouverture du fichier."; }
+
+// Initialisation du template
+$template = "";
+
+// Déclaration des préfixes d'URI
+$template .= "@prefix rdf: &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt; . \n";
+$template .= "@prefix rdfs: &lt;http://www.w3.org/2000/01/rdf-schema#&gt; . \n";
+$template .= "@prefix unicaen: &lt;http://www.unicaen.fr#&gt; . \n";
+
+// Création du premier triplet générique pour les établissements
+$template .= "unicaen:Etablissement_enseignement rdf:type rdfs:Class . \n";
+
+// Caractères spéciaux à ne pas mettre dans les triplets
+$specialChars = array
+                (
+                    " ", 
+                    "'", 
+                    "\"", 
+                    ",", 
+                    ";", 
+                    ".", 
+                    ":", 
+                    "?", 
+                    "!", 
+                    "&amp;", 
+                    "#", 
+                    "\\", 
+                    "/", 
+                    "*", 
+                    "(", 
+                    ")", 
+                    "[", 
+                    "]", 
+                    "{", 
+                    "}", 
+                    "~", 
+                    "@", 
+                    "€", 
+                    "$"
+                );
+
+// Parcours du fichier des établissements
+while (!feof($handle)) {
+	$ligne = trim(fgets($handle));
+	if ((strlen($ligne) &gt; 0) &amp;&amp; !(preg_match("#Code UAI#", $ligne))) {
+		list
+        (
+            $codeUai, 
+            $typeEtablissement, 
+            $nom, 
+            $sigle, 
+            $statut, 
+            $tutelle, 
+            $universite, 
+            $adresse, 
+            $codePostal, 
+            $commune, 
+            $departement, 
+            $academie, 
+            $region, 
+            $longitude, 
+            $latitude, 
+            $region
+        ) = explode(";", $ligne);
+        
+        // Construction des triplets RDF (instances et littéraux)
+        if (!empty($typeEtablissement)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $typeEtablissement)  . ' rdfs:subClassOf unicaen:Etablissement_enseignement .' . "\n";
+        if (!empty($tutelle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $tutelle)  . ' rdf:type unicaen:Tutelle .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($typeEtablissement)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' rdf:type unicaen:' . str_replace($specialChars, "_", $typeEtablissement) . ' .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($codeUai)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:possede _:Adresse' . $codeUai . ' .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($tutelle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:depend unicaen:' . str_replace($specialChars, "_", $tutelle) . ' .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($academie)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:academie ' . '"' . $academie . '" .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($statut)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:statut ' . '"' . $statut . '" .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($codeUai)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:code ' . '"' . $codeUai . '" .' . "\n";
+        if (!empty($nom)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:nom ' . '"' . $nom . '" .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($sigle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:sigle ' . '"' . $sigle . '" .' . "\n";
+        if (!empty($nom) &amp;&amp; !empty($typeEtablissement)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $nom) . ' unicaen:type ' . '"' . $typeEtablissement . '" .' . "\n";
+        if (!empty($codeUai)) 
+            $template .= '_:Adresse' . $codeUai . ' rdf:type unicaen:Coordonnees .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($adresse)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:intitule ' . '"' . $adresse . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($codePostal)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:CP ' . '"' . $codePostal . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($latitude)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:latitude ' . '"' . $latitude . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($longitude)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:longitude ' . '"' . $longitude . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($departement)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:departement ' . '"' . $departement . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($region)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:region ' . '"' . $region . '" .' . "\n";
+        if (!empty($codeUai) &amp;&amp; !empty($commune)) 
+            $template .= '_:Adresse' . $codeUai . ' unicaen:commune ' . '"' . strtoupper($commune) . '" .' . "\n";
+    }
+}
+
+// Fermeture du fichier des établissements
+$close = fclose($handle);
+if (!$close) { echo "Problème de fermeture du fichier."; }
+
+// Ouverture du fichier des points poste en lecture
+$handle = fopen("poste/poste.csv", "r");
+if (!$handle) { echo "Problème d'ouverture du fichier."; }
+
+// Création du premier triplet générique pour les points poste
+$template .= "unicaen:Point_poste rdf:type rdfs:Class . \n";
+
+// Parcours du fichier des points poste
+while (!feof($handle)) {
+	$ligne = trim(fgets($handle));
+	if ((strlen($ligne) &gt; 0) &amp;&amp; !(preg_match("#identifiant#", $ligne))) {
+		list
+        (
+            $identifiant, 
+            $libelle, 
+            $caracteristique, 
+            $adresse, 
+            $complementAdresse, 
+            $lieuDit, 
+            $codePostal, 
+            $localite, 
+            $pays, 
+            $latitude, 
+            $longitude
+        ) = explode(";", $ligne);
+        
+        // Construction des triplets RDF (instances et littéraux)
+        if (!empty($libelle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle)  . ' rdf:type unicaen:Point_poste .' . "\n";
+        if (!empty($libelle) &amp;&amp; !empty($identifiant)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle) . ' unicaen:se_situe _:Adresse' . $identifiant . ' .' . "\n";
+        if (!empty($libelle) &amp;&amp; !empty($identifiant)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle) . ' unicaen:identifiant ' . '"' . $identifiant . '" .' . "\n";
+        if (!empty($libelle)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle) . ' unicaen:libelle ' . '"' . $libelle . '" .' . "\n";
+        if (!empty($libelle) &amp;&amp; !empty($caracteristique)) 
+            $template .= 'unicaen:' . str_replace($specialChars, "_", $libelle) . ' unicaen:caracteristique ' . '"' . $caracteristique . '" .' . "\n";
+        if (!empty($identifiant)) 
+            $template .= '_:Adresse' . $identifiant . ' rdf:type unicaen:Coordonnees .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($adresse)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:intitule ' . '"' . $adresse . '" .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($codePostal)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:CP ' . '"' . $codePostal . '" .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($latitude)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:latitude ' . '"' . $latitude . '" .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($longitude)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:longitude ' . '"' . $longitude . '" .' . "\n";
+        if (!empty($identifiant) &amp;&amp; !empty($localite)) 
+            $template .= '_:Adresse' . $identifiant . ' unicaen:commune ' . '"' . $localite . '" .' . "\n";
+    }
+}
+
+// Affichage du résultat
+echo $template;
+
+// Fermeture du fichier des points poste
+$close = fclose($handle);
+if (!$close) { echo "Problème de fermeture du fichier."; }
+                </code>
+                </pre>
+                <img src="fleche.png" alt="Flèche vers le bas" class="fleches" />
+                <a href="ressources/enseignement_poste/enseignement_poste.rdf.txt">&rarr; Télécharger le fichier RDF (output) &larr;</a>
+            </div>
+        </section>
+        <section>
+            <h2>Requêtes SPARQL</h2>
+            <div class="wrapper">
+                <h3>Description de la ressource "unicaen:Groupe_FIM_Agneaux"</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+DESCRIBE unicaen:Groupe_FIM_Agneaux
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-1.jpg">&rarr; Voir le résultat après exécution &larr;</a> 
+                <h3>Sélection du nom de la commune d'un établissement donné (EPICOM)</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT ?commune 
+WHERE 
+{
+    unicaen:EPICOM unicaen:possede _:Adresse0342005V .
+  	_:Adresse0342005V unicaen:commune ?commune .
+}
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-2.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Vérification de l'existence de points poste à Paris</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+ASK 
+WHERE 
+{
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune "PARIS" .
+}
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-3.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection des points poste se trouvant à Paris</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT ?pp 
+WHERE 
+{
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune "PARIS" .
+}
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-4.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection des points poste se trouvant dans la commune d'un établissement donné (Institut de management et de communication interculturels)</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT ?pp 
+WHERE 
+{
+    unicaen:Institut_de_management_et_de_communication_interculturels unicaen:possede _:Adresse0753666C .
+  	_:Adresse0753666C unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune ?commune .
+}
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-5.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection des dix premiers points poste se trouvant dans la commune d'un établissement donné (Institut de management et de communication interculturels)</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT ?pp 
+WHERE 
+{
+    unicaen:Institut_de_management_et_de_communication_interculturels unicaen:possede _:Adresse0753666C .
+  	_:Adresse0753666C unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune ?commune .
+} 
+LIMIT 10
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-6.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection de dix points poste différents se trouvant dans la commune d'un établissement donné (Institut de management et de communication interculturels) en partant du onzième point poste</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT DISTINCT ?pp 
+WHERE 
+{
+    unicaen:Institut_de_management_et_de_communication_interculturels unicaen:possede _:Adresse0753666C .
+  	_:Adresse0753666C unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune ?commune .
+} 
+OFFSET 10
+LIMIT 10
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-7.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection de 10 points poste différents se trouvant dans la commune d'un établissement donné (Institut de management et de communication interculturels) en partant du onzième point poste. Les points poste sont d'abord triés par ordre alphabétique.</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT DISTINCT ?pp 
+WHERE 
+{
+    unicaen:Institut_de_management_et_de_communication_interculturels unicaen:possede _:Adresse0753666C .
+  	_:Adresse0753666C unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune ?commune .
+} 
+ORDER BY ?pp
+OFFSET 10
+LIMIT 10
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-8.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection de dix points poste différents se trouvant dans la commune d'un établissement d'enseignement qui possède elle-même plus de vingt points poste. La sélection est triée par ordre alphabétique et prend comme point de départ le onzième point poste du jeu de résultat.</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT DISTINCT ?pp ?commune
+WHERE 
+{
+    ?etablissement unicaen:possede ?adresse1 .
+  	?adresse1 unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse2 .
+  	?adresse2 unicaen:commune ?commune .
+} 
+GROUP BY ?pp ?commune
+HAVING (COUNT(?pp) > 20)
+ORDER BY ?pp
+OFFSET 10
+LIMIT 10
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-9.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection des établissements dont le nom contient le terme "management", quelle que soit la casse</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT ?nom 
+WHERE 
+{
+    ?ecole unicaen:nom ?nom .
+    FILTER regex(?nom , "management", "i")
+}
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-10.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection de la région de deux établissements donnés dont l'adresse est inconnue</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT ?region 
+WHERE 
+{
+    { 
+        unicaen:IT_Paris_Eiffel unicaen:possede ?adresse .
+        ?adresse unicaen:region ?region .
+    } 
+    UNION 
+    { 
+        unicaen:Groupe_FIM_Cherbourg unicaen:possede ?adresse .
+        ?adresse unicaen:region ?region .
+    }
+}
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-11.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection des points poste qui ne sont pas à Paris, dans l'ordre inverse de l'alphabet</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT ?pp WHERE 
+{
+    { 
+        ?pp unicaen:se_situe ?adresse .
+    	?adresse unicaen:commune ?commune .
+    }
+  	MINUS
+    { 
+    	?pp unicaen:se_situe ?adresse .
+        ?adresse unicaen:commune "PARIS" .
+    }
+}
+ORDER BY DESC(?pp)
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-12.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection de toutes les adresses complètes (répondant au triptyque &laquo; intitulé / code postal / commune &raquo;) présentes dans le triplestore. Le département et la région sont facultatifs.</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT ?intitule ?cp ?commune ?departement ?region
+WHERE 
+{
+  	?adresse unicaen:intitule ?intitule .
+  	?adresse unicaen:CP ?cp .
+	?adresse unicaen:commune ?commune .
+  	OPTIONAL 
+  	{
+    	?adresse unicaen:departement ?departement .
+  		?adresse unicaen:region ?region .
+  	} 
+}
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-13.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Sélection (avec contrainte de réduction) des ressources et des caractéristiques associées aux libellés &laquo; ABONDANT AP &raquo; et &laquo; NOGENT LE ROI BP &raquo;</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+SELECT REDUCED *
+WHERE 
+{
+  	?pp unicaen:libelle ?libelle .
+  	?pp unicaen:caracteristique ?caracteristique .
+	VALUES (?libelle)
+ 	{
+    	("ABONDANT AP")
+    	("NOGENT LE ROI BP")
+  	}
+}
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-14.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Construction d'un nouveau graphe RDF fondé sur un remplacement de prédicat (&laquo; unicaen:libelle &raquo; vers &laquo; unicaen:nom &raquo;)</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+CONSTRUCT { ?pp unicaen:nom ?libelle . }
+WHERE { ?pp unicaen:libelle ?libelle . }
+                </code>
+                </pre>
+                <a href="ressources/requetes/requete-15.jpg">&rarr; Voir le résultat après exécution &larr;</a>
+                <h3>Insertion simple d'un triplet de test</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+INSERT DATA { unicaen:Test unicaen:test "Test" . }
+                </code>
+                </pre>
+                <h3>Insertion d'un triplet de test avec contexte</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+INSERT DATA 
+{ 
+    GRAPH &lt;http://www.unicaen.fr/test&gt;
+    {
+        unicaen:Test unicaen:test "Test" . 
+    }
+}
+                </code>
+                </pre>
+                <h3>Suppression simple du triplet de test</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+DELETE DATA { unicaen:Test unicaen:test "Test" . }
+                </code>
+                </pre>
+                <h3>Modification du sigle de l'Institut Catholique de Rennes</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+DELETE { unicaen:Institut_Catholique_de_Rennes unicaen:sigle "ICR" . }
+INSERT { unicaen:Institut_Catholique_de_Rennes unicaen:sigle "Test" . }
+WHERE { unicaen:Institut_Catholique_de_Rennes unicaen:sigle "ICR" . }
+                </code>
+                </pre>
+                <h3>Suppression et restauration de toutes les données concernant l'IXAD</h3>
+                <pre>
+                <code class="language-sql">
+
+PREFIX unicaen: &lt;http://www.unicaen.fr#&gt;
+
+DELETE { unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest ?predicat ?objet . }
+INSERT
+{ 
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest rdf:type unicaen:Autre_établissement_du_supérieur .
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest unicaen:possede _:Adresse0596135Y .
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest unicaen:depend unicaen:Ministère_de_la_Justice .
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest unicaen:academie "Lille" .
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest unicaen:statut "Public" .
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest unicaen:code "0596135Y" .
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest unicaen:nom "IXAD Ecole des Avocats Nord-Ouest" .
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest unicaen:sigle "IXAD" .
+	unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest unicaen:type "Autre établissement du supérieur" .
+}
+WHERE { unicaen:IXAD_Ecole_des_Avocats_Nord-Ouest ?predicat ?objet . }
+                </code>
+                </pre>
+            </div>
+        </section>
+    </article>
+    <footer>
+        Macky Dieng &amp; Baptiste Vannesson &copy; 2015
+    </footer>
+    <script src="prism.js"></script>
+</body>
+
+</html>

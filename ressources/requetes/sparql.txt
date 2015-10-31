@@ -1,0 +1,129 @@
+1) Sélection du nom de la commune d'un établissement donné (EPICOM)
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT ?commune WHERE {
+    unicaen:EPICOM unicaen:possede _:Adresse0342005V .
+  	_:Adresse0342005V unicaen:commune ?commune .
+}
+
+2) Sélection des points poste se trouvant à Paris
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT ?pp WHERE {
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune "PARIS" .
+}
+
+3) Sélection des points poste se trouvant dans la commune d'un établissement donné (Institut de management et de communication interculturels)
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT ?pp WHERE {
+    unicaen:Institut_de_management_et_de_communication_interculturels unicaen:possede _:Adresse0753666C .
+  	_:Adresse0753666C unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune ?commune .
+}
+
+4) Sélection des 10 premiers points poste se trouvant dans la commune d'un établissement donné (Institut de management et de communication interculturels)
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT ?pp WHERE {
+    unicaen:Institut_de_management_et_de_communication_interculturels unicaen:possede _:Adresse0753666C .
+  	_:Adresse0753666C unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune ?commune .
+} LIMIT 10
+
+5) Sélection de 10 points poste différents se trouvant dans la commune d'un établissement donné (Institut de management et de communication interculturels)
+    en partant du dixième point poste
+    
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT DISTINCT ?pp WHERE 
+{
+    unicaen:Institut_de_management_et_de_communication_interculturels unicaen:possede _:Adresse0753666C .
+  	_:Adresse0753666C unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune ?commune .
+} 
+OFFSET 10
+LIMIT 10
+
+6) Sélection de 10 points poste différents se trouvant dans la commune d'un établissement donné (Institut de management et de communication interculturels)
+    en partant du dixième point poste. Les points poste sont d'abord triés par ordre alphabétique.
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT DISTINCT ?pp WHERE 
+{
+    unicaen:Institut_de_management_et_de_communication_interculturels unicaen:possede _:Adresse0753666C .
+  	_:Adresse0753666C unicaen:commune ?commune .
+  	?pp unicaen:se_situe ?adresse .
+  	?adresse unicaen:commune ?commune .
+} 
+ORDER BY ?pp
+OFFSET 10
+LIMIT 10
+
+7) Modification du sigle de l'Institut nautique de Bretagne
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+DELETE { unicaen:Institut_nautique_de_Bretagne unicaen:sigle "INB" . }
+INSERT { unicaen:Institut_nautique_de_Bretagne unicaen:sigle "Test" . }
+WHERE { unicaen:Institut_nautique_de_Bretagne unicaen:sigle "INB" . }
+
+8) Sélection des établissements dont le nom contient le terme "management"
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT ?nom WHERE {
+    ?ecole unicaen:nom ?nom .
+    FILTER regex(?nom , "management", "i")
+}
+
+9) Sélection de la région de deux établissements donnés dont l'adresse est inconnue
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT ?region WHERE 
+{
+    { 
+        unicaen:IT_Paris_Eiffel unicaen:possede ?adresse .
+        ?adresse unicaen:region ?region .
+    } 
+    UNION 
+    { 
+        unicaen:Groupe_FIM_Cherbourg unicaen:possede ?adresse .
+        ?adresse unicaen:region ?region .
+    }
+}
+
+10) Description de la ressource "unicaen:Groupe_FIM_Agneaux"
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+DESCRIBE ?nom WHERE {
+	unicaen:Groupe_FIM_Agneaux unicaen:nom ?nom .  
+}
+
+11) Sélection des établissements se trouvant dans des communes qui ne possèdent pas de point poste
+
+PREFIX unicaen: <http://www.unicaen.fr#>
+
+SELECT ?etablissement WHERE 
+{
+    { 
+        ?etablissement unicaen:possede ?adresse .
+        ?adresse unicaen:commune ?commune .
+    }
+    MINUS
+    { 
+        ?pp unicaen:se_situe ?adresse .
+        ?adresse unicaen:commune ?commune .
+    }
+}
